@@ -19,6 +19,7 @@ from .codec import (
     json_to_quipu,
     parse_quipu,
     quipu_to_json,
+    render_quipu_ascii,
     render_quipu_micro,
     sample_quipu,
 )
@@ -37,6 +38,7 @@ _QUIPU_CLI_ACTIONS = (
     "to-json",
     "bench",
     "micro",
+    "draw",
     "upgrade",
     "downgrade",
     "distill",
@@ -133,6 +135,14 @@ def _action_micro(args: argparse.Namespace, as_json: bool) -> int:
     return 0
 
 
+def _action_draw(args: argparse.Namespace, as_json: bool) -> int:
+    raw = _load_text_or_sample(getattr(args, "file", None))
+    max_rows = max(1, int(getattr(args, "max_rows", 8) or 8))
+    diagram = render_quipu_ascii(raw, max_rows=max_rows)
+    print(json.dumps({"ascii": diagram}, indent=2, ensure_ascii=False) if as_json else diagram)
+    return 0
+
+
 def _action_from_json(args: argparse.Namespace, as_json: bool) -> int:
     file_arg = getattr(args, "file", None)
     if not file_arg:
@@ -182,6 +192,7 @@ def _dispatch_quipu_action(action: str, args: argparse.Namespace, as_json: bool)
         "verify": _action_verify,
         "to-json": _action_to_json,
         "micro": _action_micro,
+        "draw": _action_draw,
         "from-json": _action_from_json,
         "bench": _action_bench,
     }
@@ -216,6 +227,13 @@ def cmd_quipu(args: argparse.Namespace) -> int:
 
 def _add_quipu_flags(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--file", default=None, help="Path to a .quipu or .json file")
+    parser.add_argument(
+        "--max-rows",
+        dest="max_rows",
+        type=int,
+        default=8,
+        help="Maximum rows per table to display in 'quipu draw' (default: 8)",
+    )
     parser.add_argument(
         "--mode",
         default="sealed",

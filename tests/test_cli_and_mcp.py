@@ -226,3 +226,36 @@ def test_serve_mcp_stdio_roundtrip() -> None:
 
     lines = [json.loads(line) for line in stdout.getvalue().splitlines() if line.strip()]
     assert [line["id"] for line in lines] == [1, 2]
+
+
+def test_draw_python_cli_and_mcp(capsys: pytest.CaptureFixture[str]) -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    telem_path = repo_root / "examples" / "telemetry_banded.quipu"
+    ledger_path = repo_root / "examples" / "ledger_sealed.quipu"
+    telem_wire = telem_path.read_text(encoding="utf-8")
+
+    # 1. Python API (draw, draw_quipu, render_quipu_ascii)
+    ascii_telem = quipu.draw(telem_wire)
+    assert ascii_telem == quipu.draw_quipu(telem_wire)
+    assert ascii_telem == quipu.render_quipu_ascii(quipu.parse(telem_wire))
+    assert "PRIMARY CORD" in ascii_telem
+    assert "(LOOP)" in ascii_telem and "(TASSEL)" in ascii_telem
+    assert "▲" in ascii_telem
+    assert "⟨1E⟩" in ascii_telem
+    assert "⤵" not in ascii_telem and "⤴ *prod_defaults" in ascii_telem
+    assert "band spacer" in ascii_telem
+
+    # 2. CLI `quipu draw` plain & JSON modes across real example fixtures
+    assert main(["draw", "--file", str(telem_path)]) == 0
+    cli_telem = capsys.readouterr().out
+    assert "PRIMARY CORD" in cli_telem
+    assert "pipeline.telemetry.batch" in cli_telem
+
+    assert main(["draw", "--file", str(ledger_path), "--json"]) == 0
+    cli_ledger = json.loads(capsys.readouterr().out)
+    assert "^net(credit, debt)=0" in cli_ledger["ascii"]
+    assert "^quota(guard, pct=22.5)=4000" in cli_ledger["ascii"]
+
+    # 3. Standalone MCP `draw` action
+    mcp_res = QuipuMCPServer().call_tool({"action": "draw", "quipu_text": telem_wire})
+    assert mcp_res["ascii"] == ascii_telem

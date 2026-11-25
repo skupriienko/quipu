@@ -1524,6 +1524,186 @@ def render_quipu_micro(doc: QuipuDocument) -> str:
     )
 
 
+MAX_ASCII_CHARS = 8000
+
+
+def _ascii_meta_badge(meta: CordMeta) -> str:
+    """Builds a compact visual metadata badge for a cord node."""
+    parts: list[str] = []
+    flags = (
+        (f"&{meta.anchor}", bool(meta.anchor)),
+        (f"~{meta.spin.value}", meta.explicit_spin or meta.spin != CordSpin.Z),
+        (f"~{meta.attachment.value}" if meta.attachment else "", meta.attachment is not None),
+        (f"@{meta.tier.value}", meta.explicit_tier or meta.tier != CordTier.T0),
+        (f"@{meta.polarity.value}" if meta.polarity else "", meta.polarity is not None),
+    )
+    parts.extend(label for label, active in flags if active)
+    for key in ("unit", "wrap", "nether"):
+        val = getattr(meta, key)
+        if val is not None:
+            val_s = json.dumps(val, ensure_ascii=False) if isinstance(val, str) else str(val)
+            parts.append(f"^{key}={val_s}")
+    return f" [{' '.join(parts)}]" if parts else ""
+
+
+def _ascii_tier_glyph(tok: str) -> str | None:
+    if tok == "1E":
+        return "⟨1E⟩"
+    suffix, digits = tok[-1], tok[:-1]
+    if not digits.isdigit():
+        return tok
+    digit = int(digits)
+    if digit == 0:
+        return None
+    if suffix == "U":
+        return "●(1U)" if digit == 1 else f"≈{digit}T≈({tok})"
+    beads = "●" * digit if digit <= 5 else f"●×{digit}"
+    return f"{beads}({tok})"
+
+
+def _ascii_knot_glyphs(val: int, explicit_knots: str | None) -> str:
+    knot_str = explicit_knots or encode_incan_knots(abs(val))
+    glyphs = [g for g in (_ascii_tier_glyph(t) for t in knot_str.split("-")) if g is not None]
+    body = " -> ".join(glyphs) if glyphs else "[0 gap]"
+    return f"{body} [{knot_str}]"
+
+
+def _collect_ascii_top_cords(node: QuipuNode, label: str, out: list[str]) -> None:
+    val = node.value
+    if isinstance(val, QuipuTable) and val.top_cords:
+        joined = " | ".join(tc for tc in (_format_top_cord(t) for t in val.top_cords) if tc)
+        out.append(f"  ▲ [{label}] {joined}")
+    elif isinstance(val, dict):
+        for k, child in val.items():
+            _collect_ascii_top_cords(child, f"{label}.{k}" if label else str(k), out)
+    elif isinstance(val, list):
+        for idx, child in enumerate(val):
+            _collect_ascii_top_cords(child, f"{label}[{idx}]", out)
+
+
+def _render_ascii_table(
+    lines: list[str], head: str, child_pad: str, table: QuipuTable, max_rows: int
+) -> None:
+    cols_s = ", ".join(f"{name}:{ctype}" for name, ctype in table.columns)
+    lines.append(f"{head}: @table({cols_s}) [{len(table.rows)} rows]")
+    limit = min(len(table.rows), max_rows)
+    spacer_set = set(table.spacer_indices)
+    for idx in range(limit):
+        if idx in spacer_set:
+            lines.append(f"{child_pad}├── ┄┄┄ [--- band spacer] ┄┄┄")
+        row_s = " | ".join(_format_scalar(cell) for cell in table.rows[idx])
+        is_tail = idx == len(table.rows) - 1 and len(table.rows) <= max_rows
+        lines.append(f"{child_pad}{'└──' if is_tail else '├──'} [{idx}] {row_s}")
+    if len(table.rows) > max_rows:
+        lines.append(f"{child_pad}└── ... (+{len(table.rows) - max_rows} more rows)")
+
+
+def _render_ascii_container(
+    lines: list[str],
+    head: str,
+    child_pad: str,
+    val: dict[str, QuipuNode] | list[QuipuNode],
+    depth: int,
+    max_rows: int,
+) -> None:
+    items = (
+        list(val.items()) if isinstance(val, dict) else [(f"[{i}]", v) for i, v in enumerate(val)]
+    )
+    lines.append(
+        f"{head}: {{{len(items)} items}}"
+        if isinstance(val, dict)
+        else f"{head}: [{len(items)} items]"
+    )
+    if depth >= 6:
+        lines.append(f"{child_pad}└── ... (max depth reached)")
+        return
+    shown = items[:max_rows]
+    has_more = len(items) > max_rows
+    for idx, (child_key, child_node) in enumerate(shown):
+        is_last = idx == len(shown) - 1 and not has_more
+        _render_ascii_node(
+            lines, child_pad, str(child_key), child_node, depth + 1, max_rows, is_last
+        )
+    if has_more:
+        lines.append(f"{child_pad}└── ... (+{len(items) - max_rows} more items)")
+
+
+def _render_ascii_node(
+    lines: list[str],
+    pad: str,
+    label: str,
+    node: QuipuNode,
+    depth: int,
+    max_rows: int,
+    is_last: bool,
+) -> None:
+    badge = _ascii_meta_badge(node.meta)
+    if depth == 0:
+        head, child_pad = f"  │── Pendant {label}{badge}", "  │   "
+    else:
+        conn = "└──" if is_last else "├──"
+        head = f"{pad}{conn} ↳ Subsidiary {label}{badge}"
+        child_pad = pad + ("    " if is_last else "│   ")
+    val = node.value
+    if isinstance(val, CordAlias):
+        lines.append(f"{head}: ⤴ *{val.target} (alias)")
+    elif isinstance(val, QuipuTable):
+        _render_ascii_table(lines, head, child_pad, val, max_rows)
+    elif isinstance(val, (dict, list)):
+        _render_ascii_container(lines, head, child_pad, val, depth, max_rows)
+    elif isinstance(val, int) and not isinstance(val, bool):
+        lines.append(f"{head}: val={val}")
+        lines.append(f"{child_pad}└── Knots: {_ascii_knot_glyphs(val, node.meta.knots)}")
+    else:
+        lines.append(f"{head}: {_format_scalar(val)}")
+
+
+def _ascii_header_line(doc: QuipuDocument) -> str:
+    knot = doc.seal.knot if doc.seal else "unsealed"
+    parts = [f"mode={doc.mode.value}"]
+    if doc.admin_tier:
+        parts.append(f"tier={doc.admin_tier.value}")
+    if doc.tag:
+        parts.append(f"tag={json.dumps(doc.tag, ensure_ascii=False)}")
+    if doc.hub:
+        parts.append(f"hub={json.dumps(doc.hub, ensure_ascii=False)}")
+    meta_s = " ".join(parts)
+    return f"=== {doc.version}: {doc.doc_id} [{meta_s} | knot={knot}] ==="
+
+
+def render_quipu_ascii(
+    doc_or_text: QuipuDocument | str,
+    *,
+    max_rows: int = 8,
+    max_chars: int = MAX_ASCII_CHARS,
+) -> str:
+    """Renders a visual CLI cord diagram with Top Cords, Primary Cord, Pendants & Knots."""
+    doc = parse_quipu(doc_or_text) if isinstance(doc_or_text, str) else doc_or_text
+    lines = [_ascii_header_line(doc), ""]
+    top_lines: list[str] = []
+    _collect_ascii_top_cords(
+        doc.root, "root" if not isinstance(doc.root.value, dict) else "", top_lines
+    )
+    if top_lines:
+        lines.append("  [TOP CORDS: UPWARD RECONCILIATIONS]")
+        lines.extend(top_lines)
+        lines.append("  │")
+    lines.append("(LOOP)" + "═" * 74 + "(TASSEL)")
+    lines.append("[Head]" + " " * 19 + "PRIMARY CORD (HORIZONTAL TRUNK)" + " " * 24 + "[Tail]")
+    lines.append("")
+    if isinstance(doc.root.value, dict):
+        keys = list(doc.root.value.keys())
+        for idx, k in enumerate(keys):
+            _render_ascii_node(lines, "", k, doc.root.value[k], 0, max_rows, idx == len(keys) - 1)
+    else:
+        _render_ascii_node(lines, "", "root", doc.root, 0, max_rows, True)
+    lines.append("═" * 88)
+    out = "\n".join(lines)
+    if len(out) > max_chars:
+        return out[: max(64, max_chars - 32)] + "\n... [TRUNCATED_TO_MAX_ASCII_CHARS]"
+    return out
+
+
 def _sample_v2_metas(
     is_v2: bool,
 ) -> tuple[list[TopCordSpec], CordMeta, CordMeta, CordMeta, CordMeta]:
@@ -1632,3 +1812,5 @@ def dump(
 loads = loads_quipu
 dumps = dumps_quipu
 parse = parse_quipu
+draw_quipu = render_quipu_ascii
+draw = render_quipu_ascii

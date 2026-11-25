@@ -18,6 +18,7 @@ from .codec import (
     loads_quipu,
     parse_quipu,
     quipu_to_json,
+    render_quipu_ascii,
     render_quipu_micro,
     sample_quipu,
 )
@@ -39,6 +40,7 @@ QUIPU_ACTIONS: tuple[str, ...] = (
     "from_json",
     "to_json",
     "micro",
+    "draw",
     "benchmark",
     "upgrade",
     "downgrade",
@@ -159,6 +161,7 @@ class QuipuMCPServer:
             "from_json": self._action_from_json,
             "to_json": self._action_to_json,
             "micro": self._action_micro,
+            "draw": self._action_draw,
             "benchmark": self._action_benchmark,
             "upgrade": self._action_upgrade,
             "downgrade": self._action_downgrade,
@@ -204,6 +207,10 @@ class QuipuMCPServer:
     def _action_micro(self, args: dict[str, Any]) -> dict[str, Any]:
         quipu_text = _require_str_arg(args, "quipu_text", "micro")
         return {"micro": render_quipu_micro(parse_quipu(quipu_text))}
+
+    def _action_draw(self, args: dict[str, Any]) -> dict[str, Any]:
+        quipu_text = _require_str_arg(args, "quipu_text", "draw")
+        return {"ascii": render_quipu_ascii(quipu_text)}
 
     def _action_benchmark(self, args: dict[str, Any]) -> dict[str, Any]:
         if "data" in args:

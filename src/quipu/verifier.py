@@ -64,7 +64,7 @@ _V2_LAWS = [
     "QLAW_10_HEADER_TIER_AND_LINEAGE",
 ]
 
-_PARENT_KNOT_RE = re.compile(r"^quipu-[0-9a-f]{12}$")
+_PARENT_KNOT_RE = re.compile(r"^(?:[a-z][a-z0-9_]{1,15}-[0-9a-f]{12}|none)$")
 _SAFE_TAG_RE = re.compile(r"^[A-Za-z0-9_.\-/: ]{1,128}$")
 _VALID_LAYOUTS = frozenset({"banded", "seriated"})
 _VALID_BAND_RATIOS: dict[str, float] = {

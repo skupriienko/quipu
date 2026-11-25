@@ -129,7 +129,11 @@ report = quipu.verify(wire)
 assert report["valid"] is True
 assert len(report["laws_checked"]) == 10  # 7 laws for QUIPU/1.0, 10 for QUIPU/2.0
 
-# 4. Version compatibility, distillation & multi-packet federation
+# 4. Visual CLI cord diagram & bit-register fingerprint
+print(quipu.draw(wire))
+print(quipu.render_quipu_micro(doc))
+
+# 5. Version compatibility, distillation & multi-packet federation
 v1_doc = quipu.downgrade_quipu_to_v1(wire)
 v2_doc = quipu.upgrade_quipu_to_v2(v1_doc, admin_tier="working", tag="ci")
 summary_doc = quipu.distill_working_to_summary(v2_doc)
@@ -154,6 +158,10 @@ quipu to-json --file examples/telemetry_banded.quipu
 # Benchmark bytes and token savings vs JSON
 quipu bench --file examples/telemetry_banded.quipu
 
+# Render a visual ASCII/Unicode cord diagram in the terminal
+quipu draw --file examples/telemetry_banded.quipu --max-rows 8
+quipu draw --file examples/ledger_sealed.quipu
+
 # Emit compact 7-bit / 14-bit micro summary line
 quipu micro --file examples/telemetry_banded.quipu
 
@@ -168,9 +176,78 @@ quipu mcp
 
 ---
 
+## Visual CLI Cord Renderer (`quipu draw`)
+
+You can render any `.quipu` document (`QUIPU/1.0` or `QUIPU/2.0`) as an ASCII/Unicode cord diagram in your terminal or inspect it programmatically in Python — displaying upward **Top Cords** (`▲`), the horizontal **Primary Cord** (`(LOOP)═══(TASSEL)`), **Pendant / Subsidiary** hierarchies (`↳`), **Alias pointers** (`⤴`), **band spacers** (`┄┄┄`), and **decimal knot clusters** (`●`, long-knot turns `≈NT≈`, figure-eight `⟨1E⟩`):
+
+```bash
+# CLI: render a .quipu fixture directly to stdout (or pass --json for {"ascii": ...})
+quipu draw --file examples/telemetry_banded.quipu
+quipu draw --file examples/ledger_sealed.quipu
+```
+
+```python
+import quipu
+
+with open("examples/telemetry_banded.quipu", encoding="utf-8") as fh:
+    print(quipu.draw(fh.read(), max_rows=8))  # aliases: quipu.draw_quipu(), quipu.render_quipu_ascii()
+```
+
+### Example 1: Banded Telemetry, Anchors/Aliases, `~R`/`~V` Branches & `1E` Knot (`examples/telemetry_banded.quipu`)
+
+```text
+=== QUIPU/2.0: pipeline.telemetry.batch [mode=sealed tier=working tag="metrics" | knot=quipu-52623ab5e312] ===
+
+  [TOP CORDS: UPWARD RECONCILIATIONS]
+  ▲ [stage_metrics] ^count=4 | ^sum(tokens)=500 | ^sum(tokens, 0, 1)=300 | ^tol(tokens, pct=5.0)=490 | ^band(tokens, ratio="3/5")=500
+  │
+(LOOP)══════════════════════════════════════════════════════════════════════════(TASSEL)
+[Head]                   PRIMARY CORD (HORIZONTAL TRUNK)                        [Tail]
+
+  │── Pendant service [~R @W]: "edge-gateway"
+  │── Pendant defaults [&prod_defaults ~Z @T0]: {2 items}
+  │   ├── ↳ Subsidiary region: "eu-central-1"
+  │   └── ↳ Subsidiary retries [^unit="attempts" ^wrap="bounded_backoff"]: val=41
+  │       └── Knots: ●●●●(4D) -> ⟨1E⟩ [0M-0C-4D-1E]
+  │── Pendant active_defaults: ⤴ *prod_defaults (alias)
+  │── Pendant canary_override [~S ~V @T2 @D]: {1 items}
+  │   └── ↳ Subsidiary retries [^nether=3]: val=38
+  │       └── Knots: ●●●(3D) -> ≈8T≈(8U) [0M-0C-3D-8U]
+  │── Pendant stage_metrics [@W ^unit="tokens"]: @table(stage:str, tokens:int, passed:bool) [4 rows]
+  │   ├── [0] "ingest" | 120 | true
+  │   ├── [1] "validate" | 180 | true
+  │   ├── ┄┄┄ [--- band spacer] ┄┄┄
+  │   ├── [2] "transform" | 140 | true
+  │   └── [3] "export" | 60 | true
+════════════════════════════════════════════════════════════════════════════════════════
+```
+
+### Example 2: Double-Entry Ledger with Upward Top-Cord Assertions (`examples/ledger_sealed.quipu`)
+
+```text
+=== QUIPU/2.0: treasury.q4.ledger [mode=sealed tier=working tag="fiscal_reconciliation" | knot=quipu-a351f60d7a7d] ===
+
+  [TOP CORDS: UPWARD RECONCILIATIONS]
+  ▲ [ledger] ^count=4 | ^sum(credit, 0, 1)=600 | ^net(credit, debt)=0 | ^equal_sum(credit, debt)=1000 | ^tol(credit, pct=5.0)=980 | ^band(credit, ratio="3/5")=1000 | ^quota(guard, pct=22.5)=4000
+  │
+(LOOP)══════════════════════════════════════════════════════════════════════════(TASSEL)
+[Head]                   PRIMARY CORD (HORIZONTAL TRUNK)                        [Tail]
+
+  │── Pendant currency [~Z @T0]: "USD"
+  │── Pendant ledger [~Z @T0 @W ^unit="usd"]: @table(region:str, credit:int, debt:int, guard:int) [4 rows]
+  │   ├── [0] "North" | 300 | 250 | 200
+  │   ├── [1] "East" | 300 | 250 | 200
+  │   ├── ┄┄┄ [--- band spacer] ┄┄┄
+  │   ├── [2] "South" | 200 | 250 | 250
+  │   └── [3] "West" | 200 | 250 | 250
+════════════════════════════════════════════════════════════════════════════════════════
+```
+
+---
+
 ## MCP Client Configuration
 
-`quipu` includes a pure-stdlib Stdio JSON-RPC 2.0 MCP server (`quipu mcp`) exposing the `quipu_codec` tool (`verify`, `encode`, `decode`, `from_json`, `to_json`, `micro`, `benchmark`, `upgrade`, `downgrade`, `distill`).
+`quipu` includes a pure-stdlib Stdio JSON-RPC 2.0 MCP server (`quipu mcp`) exposing the `quipu_codec` tool (`verify`, `encode`, `decode`, `from_json`, `to_json`, `micro`, `draw`, `benchmark`, `upgrade`, `downgrade`, `distill`).
 
 Add the following to your MCP client configuration (Claude Desktop, Cursor, Windsurf, Kilo Code, etc.):
 

@@ -40,6 +40,7 @@ quipu from-json --file data.json --mode sealed
 quipu to-json --file payload.quipu
 quipu bench --file data.json --json
 quipu micro --file payload.quipu
+quipu draw --file payload.quipu --max-rows 8
 quipu upgrade --file v1.quipu --admin-tier working --tag release
 quipu downgrade --file v2.quipu
 quipu distill --file working.quipu
@@ -50,5 +51,5 @@ quipu mcp
 
 Configure `quipu mcp` as a zero-dependency Stdio JSON-RPC 2.0 MCP server exposing tool `quipu_codec`:
 
-- **Actions**: `verify`, `encode`, `decode`, `from_json`, `to_json`, `micro`, `benchmark`, `upgrade`, `downgrade`, `distill`.
+- **Actions**: `verify`, `encode`, `decode`, `from_json`, `to_json`, `micro`, `draw`, `benchmark`, `upgrade`, `downgrade`, `distill`.
 - **Parameters**: `quipu_text`, `json_text`, `data`, `doc_id`, `mode`, `version`, `admin_tier`, `tag`, `hub`, `auto_table`, `require_seal`.

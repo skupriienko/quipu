@@ -238,6 +238,7 @@ print(quipu.quantize_bucket(1200)) # -> 1000 (clamped ceiling)
 
 doc = quipu.parse(open("examples/telemetry_banded.quipu", encoding="utf-8").read())
 print(quipu.render_quipu_micro(doc))
+print(quipu.draw(doc, max_rows=8))  # Visual cord & decimal knot diagram
 ```
 
 ---
@@ -308,9 +309,10 @@ quipu verify --file examples/legacy_v1.quipu --json
 quipu from-json --file payload.json --mode sealed --format-version 2.0 > payload.quipu
 quipu to-json --file payload.quipu
 
-# Benchmark and compact micro inspection
+# Benchmark, compact micro inspection & visual cord diagram
 quipu bench --file examples/ledger_sealed.quipu --json
 quipu micro --file examples/ledger_sealed.quipu
+quipu draw --file examples/ledger_sealed.quipu --max-rows 8
 ```
 
 ### Stdio MCP JSON-RPC 2.0 (`quipu mcp`)
