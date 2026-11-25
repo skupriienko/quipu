@@ -169,7 +169,7 @@ def _check_v2_header_and_tags(doc: QuipuDocument, findings: list[dict[str, str]]
             findings,
             "QLAW_10_HEADER_TIER_AND_LINEAGE",
             "$.header.parent",
-            f"Invalid parent knot {doc.parent!r}; expected 'quipu-<12hex>'",
+            f"Invalid parent knot {doc.parent!r}; expected '<prefix>-<12hex>' or 'none'",
         )
     for label, val in (("tag", doc.tag), ("hub", doc.hub)):
         if val is not None and not _SAFE_TAG_RE.match(val):
