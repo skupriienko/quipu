@@ -52,6 +52,7 @@ from .ast_nodes import (
 )
 from .cli import cmd_quipu, main
 from .codec import (
+    MAX_ASCII_CHARS,
     compute_quipu_seal,
     data_to_quipu,
     draw,
@@ -91,6 +92,7 @@ __version__ = "2.0.0"
 __all__ = [
     "DEFAULT_QUIPU_VERSION",
     "MAX_ALIAS_EXPANSIONS",
+    "MAX_ASCII_CHARS",
     "MAX_COMPOUND_SUM_DEPTH",
     "MAX_QUIPU_BYTES",
     "MAX_QUIPU_DEPTH",

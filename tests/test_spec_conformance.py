@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from quipu import MAX_ASCII_CHARS
 from quipu.ast_nodes import (
     MAX_ALIAS_EXPANSIONS,
     MAX_COMPOUND_SUM_DEPTH,
@@ -17,7 +18,6 @@ from quipu.ast_nodes import (
 )
 from quipu.cli import _QUIPU_CLI_ACTIONS
 from quipu.codec import (
-    MAX_ASCII_CHARS,
     compute_quipu_seal,
     loads_quipu,
     parse_quipu,

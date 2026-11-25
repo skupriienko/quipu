@@ -21,7 +21,7 @@ JSON, YAML, and TOML each solve a narrow slice of structured data exchange while
 4. **Curated CWE / OWASP Vulnerability & Rule Vaults (`@table` + `QLAW_03`)**: Maintaining multi-hundred-row static-analysis rule catalogs and remediation matrices as diff-friendly `@table` grids ensures accidental row deletion, column shifts, or severity-plane drift trip `QLAW_03` (`^count`, `^sum`) immediately in CI.
 5. **Multi-Agent Parallel Fan-Out & Hub Handoffs (`link_quipus`)**: Independent worker agents (researcher, implementer, verifier) emit small, self-contained sealed packets (`1.0` or `2.0`) that a coordinator merges into one federated `hub` manifest via `link_quipus()`, preserving end-to-end cryptographic provenance without context-window bloat.
 6. **Prompt-Injection & RAG Taint Quarantine (`@T0..@T3`, `~Z`/`~S`)**: Labeling system policies (`~Z @T0` immutable SSOT) alongside untrusted web/user/MCP tool payloads (`~S @T3`) prevents accidental mutation (`QLAW_05`) and enforces taint non-escalation (`QLAW_06`) so trusted nodes can never reference untrusted anchors.
-7. **Content-Addressed Context Cartridges & Memory Snapshots (`parent`)**: Pinning distilled reference packs, episodic agent logs, and session checkpoints by `quipu-<12hex>` seals lets runtimes verify cache freshness in $O(1)$ and trace derived summaries back to exact upstream artifacts via `parent="quipu-..."`.
+7. **Content-Addressed Context Cartridges & Cross-Artifact Lineage (`parent`)**: Pinning distilled reference packs, episodic agent logs, and session checkpoints by `quipu-<12hex>` seals lets runtimes verify cache freshness in $O(1)$ and trace derived summaries back to exact upstream artifacts via cross-artifact `parent` links (`<prefix>-<12hex>` such as `quipu-...`, `bundle-...`, `trace-...`, or `"none"`).
 8. **Double-Entry FinOps, Token Budgets & Ranked Scorecards (`@W`/`@D`, `^net`, `^tol`)**: Financial ledgers, LLM token budgets, and prioritized triage tables declare credit/debt polarity (`@W`/`@D`), conservation equations (`^net`, `^equal_sum`), overrun guardrails (`^tol`), contiguous rank sums (`^sum(rank)`), and zero-blocker invariants (`^sum(blockers)=0`) to catch silent arithmetic hallucinations before downstream APIs execute.
 9. **Primary / Canary Rollout Twins (`~R`/`~V` & `^unit`)**: Active production parameters (`~R`) and shadow/canary verification twins (`~V`) live side-by-side under explicit physical/semantic units (`^unit="ms"`, `^unit="usd"`, `^unit="tokens"`) without inventing ad-hoc `"_shadow"` key suffixes or mismatching milliseconds vs seconds.
 10. **Self-Auditing Workspace & Package Inventories (`^count` + `^sum`)**: Release engineering scripts emit dual-ledger artifact manifests tracking file paths, versions, and SHA-256 checksums backed by inline `^count` and `^sum` assertions to catch silent workspace drift before publishing.
@@ -79,8 +79,8 @@ Every QUIPU decorator, directive, and register strips cleanly during `loads()`/`
 | **Base-10 Knots & `1E`** | `^knots="0M-0C-4D-1E"` (`CordMeta.knots`) | Positional decimal parity (`M-C-D-U`) plus `1E` figure-eight singular/sentinel marker (`encode_knots(..., figure_eight_unit=True)`). Catches silent integer corruption or LLM digit hallucinations (`QLAW_02`). |
 | **Bounded DAG Reuse** | `&anchor` / `*alias` (`CordAlias`) | Acyclic node reuse capped at `<= 1024` expansions and `<= 10` chain depth (`QLAW_04`, `QLAW_09`). Eliminates repetition without YAML's billion-laughs DoS (`CWE-776`). |
 | **Typed Tables & Top-Cords** | `@table(...)`, `---`, `^layout`, `^count`, `^sum`, `^net`, `^equal_sum`, `^tol`, `^band`, `^quota` | Columnar typed tables with row spacers (`---`), slice sums `^sum(col, s, e)`, double-entry `^net`/`^equal_sum`, overrun guard `^tol`, spacer ratio `^band`, and cohort projection `^quota` (`QLAW_03`, `QLAW_08`). |
-| **Header Governance & Seal** | `~=`, `mode`, `tier`, `tag`, `parent`, `hub`, `=~` | Enforces `MAX_WORKING_ROWS = 1000` context bounds (`working` vs `summary` vs `hybrid`), cryptographic `parent` lineage, `hub` federation, and SHA-256 tamper evidence (`QLAW_01`, `QLAW_10`). |
-| **Registers & Quantization** | `encode_7bit`, `encode_14bit`, `SCALE_BUCKETS`, `quantize_bucket`, `project_quota_population`, `render_quipu_micro` | Compact bit vectors, logarithmic scale buckets (`1..1000`), and single-line micro fingerprints for $O(1)$ routing, indexing, and capacity projection without full AST parsing. |
+| **Header Governance & Seal** | `~=`, `mode`, `tier`, `tag`, `parent`, `hub`, `=~` | Enforces `MAX_WORKING_ROWS = 1000` context bounds (`working` vs `summary` vs `hybrid`), cross-artifact `parent` lineage (`<prefix>-<12hex>` \| `none`), `hub` federation, and SHA-256 tamper evidence (`QLAW_01`, `QLAW_10`). |
+| **Registers & Quantization** | `encode_7bit`, `encode_14bit`, `SCALE_BUCKETS`, `quantize_bucket`, `project_quota_population`, `render_quipu_micro`, `MAX_ASCII_CHARS` | Compact bit vectors, logarithmic scale buckets (`1..1000`), single-line micro fingerprints, and 8KB-bounded CLI cord diagrams (`MAX_ASCII_CHARS = 8_000`) for $O(1)$ routing and capacity projection without full AST parsing. |
 
 ---
 
@@ -284,9 +284,22 @@ While all wire tokens and Python identifiers in `QUIPU/2.0` use concise English 
 
 ---
 
+## Conformance Profiles & Interoperability Vectors
+
+`quipu` targets strict RFC-grade interoperability across four incremental conformance profiles defined in [docs/SPECIFICATION.md](docs/SPECIFICATION.md):
+
+- **Profile A — Core Reader/Writer**: Lossless `QUIPU/1.0` & `QUIPU/2.0` parsing, JSON bijection (`loads`/`dumps`, `load`/`dump`), deterministic canonical serialization, and SHA-256 `=~` sealing.
+- **Profile B — Full Static Verifier**: Deterministic 7-law (`1.0`) and 10-law (`2.0`) validation (`QLAW_01`..`QLAW_10`), plus explicit error routing between parse syntax failures (`QLAW_00_SYNTAX` -> `SYNTAX_ERROR`) and resource/safety bounds (`QLAW_07_SAFETY_BOUNDS` -> `SAFETY_VIOLATION`).
+- **Profile C — Shims, Distillation & Federation**: Lossless `upgrade_quipu_to_v2()`, `downgrade_quipu_to_v1()`, `distill_working_to_summary()`, and multi-packet `link_quipus()`.
+- **Profile D — Operational Renderers, CLI & Stdio MCP**: `render_quipu_micro()`, `draw()` (`MAX_ASCII_CHARS = 8_000`), all 11 CLI subcommands, and the Stdio JSON-RPC 2.0 MCP server (`2024-11-05`).
+
+Appendix A of [docs/SPECIFICATION.md](docs/SPECIFICATION.md) ships **6 positive golden vectors (`V1`–`V6`)** with locked SHA-256 seals and **12 negative syntax/law vectors (`NEG-01`..`NEG-12`)**, verified automatically by [tests/test_spec_conformance.py](tests/test_spec_conformance.py).
+
+---
+
 ## Documentation & Examples
 
-- **Formal Specification**: [docs/SPECIFICATION.md](docs/SPECIFICATION.md) — EBNF grammar, lexical rules, canonical SHA-256 sealing, all 10 verification laws (`QLAW_01`..`QLAW_10`), CWE bounds, and full heritage glossary.
+- **Formal Specification**: [docs/SPECIFICATION.md](docs/SPECIFICATION.md) — RFC-grade wire specification covering Conformance Profiles A–D, conflict-free EBNF, byte-exact lexical escaping, canonical SHA-256 sealing, `auto_table` column inference, `QLAW_00`..`QLAW_10`, operational renderers (`MAX_ASCII_CHARS = 8_000`), CLI & MCP (`2024-11-05`) contracts, `application/quipu` media-type template, 18 normative interoperability test vectors, and heritage glossary.
 - **Cookbook & Patterns**: [docs/EXAMPLES.md](docs/EXAMPLES.md) — End-to-end recipes for configs, double-entry ledgers, banded telemetry, decorators, compatibility shims, CLI, and MCP JSON-RPC.
 - **Runnable `.quipu` Fixtures**:
   - [examples/config_lax.quipu](examples/config_lax.quipu) — Ergonomic headerless config with comments
