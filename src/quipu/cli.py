@@ -1,6 +1,6 @@
 """quipu.cli — Standalone CLI for QUIPU/2.0 & QUIPU/1.0 (.quipu) Format & Verification.
 
-Supports `sample`, `verify`, `from-json`, `to-json`, `bench`, `micro`, `upgrade`,
+Supports `sample`, `verify`, `from-json`, `to-json`, `bench`, `micro`, `draw`, `upgrade`,
 `downgrade`, `distill`, and `mcp`. Enforces CWE-22 path containment within the
 current working directory, user home directory, or system temp directory.
 """

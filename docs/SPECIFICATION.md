@@ -129,12 +129,12 @@ seal          ::= "=~" seal_attr+ ;
 seal_attr     ::= IDENT "=" ( STRING | IDENT ) ;
 
 root          ::= implicit_map | node ;
-implicit_map  ::= map_entry ( ( "," | NEWLINE+ ) map_entry )* [ "," ] ;
+implicit_map  ::= map_entry ( ( "," NEWLINE* | NEWLINE+ ) map_entry )* [ "," NEWLINE* ] ;
 
 map_entry     ::= key decorators ":" NEWLINE* node ;
 key           ::= STRING | bare_ident ;        (* bare_ident := IDENT - _RESERVED_BARE *)
 
-node          ::= decorators NEWLINE* value ;
+node          ::= decorators NEWLINE* value ;  (* decorators are single-line: no NEWLINE inside *)
 decorators    ::= ( anchor | spin | attachment | tier | polarity
                   | knots | unit | wrap | nether )* ;
 
@@ -157,11 +157,11 @@ value         ::= braced_map
                 | "true" | "false" | "null" | "_" ;
 
 braced_map    ::= "{" NEWLINE*
-                  [ map_entry ( ( "," | NEWLINE+ ) map_entry )* [ "," ] ]
+                  [ map_entry ( ( "," NEWLINE* | NEWLINE+ ) map_entry )* [ "," NEWLINE* ] ]
                   NEWLINE* "}" ;
 
 list          ::= "[" NEWLINE*
-                  [ node ( ( "," | NEWLINE+ ) node )* [ "," ] ]
+                  [ node ( ( "," NEWLINE* | NEWLINE+ ) node )* [ "," NEWLINE* ] ]
                   NEWLINE* "]" ;
 
 alias         ::= "*" IDENT ;
@@ -170,7 +170,7 @@ table         ::= "@table" "(" col_list ")" top_cords
                   NEWLINE* "{" NEWLINE* table_body "}" top_cords ;
 col_list      ::= col_def ( "," NEWLINE* col_def )* [ "," ] NEWLINE* ;
 col_def       ::= IDENT ":" IDENT [ "?" ] ;
-table_body    ::= ( ( row ( NEWLINE+ | &("}") ) ) | ( "---" NEWLINE* ) )* ;
+table_body    ::= ( row ( NEWLINE+ | "" ) | "---" NEWLINE* )* ; (* row terminated by NEWLINE+ or '}' *)
 row           ::= cell ( "|" cell )* ;         (* exact arity == len(col_list) *)
 cell          ::= STRING | NUMBER | "true" | "false" | "null" | "_" ;
 
@@ -189,7 +189,7 @@ top_cord      ::= "^count" "=" INT
 ### 3.2 Parser Disambiguation & Semantic Rules
 
 1. **Implicit Root Map Lookahead**: After the optional header, the parser performs bounded lookahead: if the first token is a valid map `key`, followed by zero or more valid `decorators`, followed immediately (without crossing a newline) by `":"`, the root MUST parse as `implicit_map`; otherwise it MUST parse as a single `node` (allowing scalar, list, `@table`, braced map, or annotated root documents).
-2. **Map Key vs. Value Decorator Merging**: On `map_entry`, decorators MAY appear on the key side (`k ~S @T2: 1`), the value side (`k: ~S @T2 1`), or split across both (`k ~S: @T2 1`). The parser merges both `CordMeta` records. Declaring the same decorator category (`spin`, `tier`, `anchor`, `knots`, `attachment`, `polarity`, `unit`, `wrap`, `nether`) twice on one side OR on both sides MUST raise `QuipuSyntaxError`.
+2. **Map Key vs. Value Decorator Merging & Single-Line Headers**: `header`, `seal`, and any single `decorators` run are single-line (`_parse_header_kv`, `_parse_seal`, and `_parse_decorators` MUST NOT skip `NEWLINE` tokens), whereas `NEWLINE*` IS allowed between `":"` and value-side decorators and between value-side decorators and `value`. On `map_entry`, decorators MAY appear on the key side (`k ~S @T2: 1`), the value side (`k: ~S @T2 1`), or split across both (`k ~S: @T2 1`). The parser merges both `CordMeta` records. Declaring the same decorator category (`spin`, `tier`, `anchor`, `knots`, `attachment`, `polarity`, `unit`, `wrap`, `nether`) twice on one side OR on both sides MUST raise `QuipuSyntaxError`.
 3. **Duplicate Keys & Columns**: Duplicate keys within any map (implicit root or braced) and duplicate column names within `@table(...)` MUST raise `QuipuSyntaxError`.
 4. **Pre-Brace and Post-Brace Top-Cords**: `@table` parsers MUST accept `top_cords` both before `{` and after `}`, appending them in encounter order. If `^layout` is specified more than once, the final declaration wins.
 5. **Nesting Depth Enforcement**: Root node starts at `depth = 0`. Entering each child of a map or list increments `depth` by `1`; entering `@table` checks `depth + 1 > MAX_QUIPU_DEPTH`. Exceeding `MAX_QUIPU_DEPTH` (`32`) MUST raise `QuipuSyntaxError`.
@@ -286,7 +286,7 @@ Line endings in canonical output MUST be LF (`\n`, `0x0A`) only. `serialize_quip
 6. **Canonical Lists (`format_list(items, indent)`)**:
    - Empty list: `[]`.
    - Inline heuristic: If `len(items) <= 4` AND every item has `not item.meta.has_annotations()` AND `item.value` is a scalar (`null`, `bool`, `int`, `float`, `str`), construct `inline = "[" + ", ".join(format_scalar(x.value)) + "]"`. If `len(inline) <= 72` (measured in Unicode code points), emit `inline`.
-   - Otherwise emit multiline with `2 * depth` leading spaces (`pad = " " * indent`):
+   - Otherwise emit multiline with `2 * depth` leading spaces (`pad = " " * indent`), emitting a trailing comma `,` after every element EXCEPT the final item:
      ```text
      [
        <format_node(item_0, indent + 2)>,
@@ -294,19 +294,19 @@ Line endings in canonical output MUST be LF (`\n`, `0x0A`) only. `serialize_quip
        <format_node(item_last, indent + 2)>
      ]
      ```
-     No trailing comma on the final element.
 7. **Canonical Braced Maps (`format_map(entries, indent)`)**:
    - Empty map: `{}`.
-   - Non-empty map: `"{\n"` + each entry via `format_map_entry(k, v, indent + 2)` joined by `"\n"` + `"\n" + (" " * indent) + "}"`. No trailing commas.
+   - Non-empty map: `"{\n"` + each entry via `format_map_entry(k, v, indent + 2)` joined by `"\n"` + `"\n" + (" " * indent) + "}"`. Note the deliberate canonical asymmetry: multiline maps (both braced and implicit root) emit **newline-only separators (zero commas)**, whereas multiline lists emit trailing commas between elements.
 8. **Canonical Tables (`format_table(table, indent)`)**:
    - Header: `@table(` + `", ".join(f"{name}:{ctype}")` + `)`.
+   - **Parser Normalization Invariant**: During parsing, `_parse_named_float_opt()` converts `pct` to `float(val)` (defaulting omitted `pct` to `5.0` on `^tol` and `22.5` on `^quota`), and `_parse_band_directive()` defaults omitted `ratio` to `"1/2"`. Consequently, `^tol(v, pct=10)=95`, `^tol(v)=95`, and `^band(v)=100` normalize in the AST and serialize deterministically as `^tol(v, pct=10.0)=95`, `^tol(v, pct=5.0)=95`, and `^band(v, ratio="1/2")=100`.
    - Directives: If `table.layout is not None`, prepend `^layout=<canon_str(layout)>`, followed by each `tc` in `table.top_cords` in list order, joined by single spaces (with a single leading space after `)` if non-empty):
      - `count`: `^count=<expected>`
      - `sum` (full): `^sum(<col>)=<expected>`
      - `sum` (slice): `^sum(<col>, <start>, <end>)=<expected>`
      - `net` / `equal_sum`: `^<kind>(<col>, <end_col>)=<expected>`
-     - `tol` / `quota`: `^<kind>(<col>, pct=<tolerance_pct>)=<expected>` (omit `, pct=...` only if `tolerance_pct is None`)
-     - `band`: `^band(<col>, ratio=<canon_str(ratio)>)=<expected>` (omit `, ratio=...` only if `ratio` is falsy)
+     - `tol` / `quota`: `^<kind>(<col>, pct=<tolerance_pct>)=<expected>` (omit `, pct=...` only when programmatically constructed with `tolerance_pct=None`)
+     - `band`: `^band(<col>, ratio=<canon_str(ratio)>)=<expected>` (omit `, ratio=...` only when programmatically constructed with falsy `ratio`)
    - Empty table with no spacers: `<header><directives> {}`.
    - Non-empty (or containing spacers): `<header><directives> {\n`, then for each `r_idx` in `0..len(rows)-1`, emit `(" " * (indent + 2)) + "---"` once per occurrence of `r_idx` in `spacer_indices`, followed by `(" " * (indent + 2)) + " | ".join(format_scalar(cell))`. After all rows, emit any spacers at index `len(rows)`. Close with `\n` + `(" " * indent) + "}"`.
 
@@ -325,11 +325,7 @@ When emitting a sealed wire document (`dump_quipu` with `include_header=True`):
 <body_without_trailing_lf>\n\n=~ knot="<knot>" sha256="<digest>" reconciled=true\n
 ```
 
-When emitting an unsealed wire document (`seal is None` or `include_header=False`):
-
-```text
-<body_without_trailing_lf>\n
-```
+When emitting an unsealed wire document (`seal is None` or `include_header=False`), `dump_quipu()` returns `<body_without_trailing_lf>\n` with no `=~` footer; if `recompute_seal=True` (or `doc.mode == sealed` when `recompute_seal is None`), `doc.seal` is still computed over `serialize_quipu_body(doc, include_header=True)` and stored on the AST even when `include_header=False`.
 
 **Reference Seal Verification**: For `examples/ledger_sealed.quipu`, hashing its canonical body yields:
 
@@ -354,7 +350,7 @@ All decorators attach to `QuipuNode.meta` (`CordMeta`) and strip cleanly during 
 | `^wrap="..."` | `2.0` | `wrap: str \| None` | Codec, cryptographic, or compliance wrapper tag (`"hmac_sha256"`, `"base64"`, `"pii_redacted"`). | Transports encoding provenance out-of-band without altering decoded scalar values. |
 | `^nether=<num>` | `2.0` | `nether: int \| float \| None` | Auxiliary finite numeric epoch, fee weight, or reconciliation delta. | Carries secondary audit weights alongside a primary value without polluting `loads()`. |
 | `^knots="..."` | `1.0`, `2.0` | `knots: str \| None` | Positional base-10 integer parity string (`<M>M-<C>C-<D>D-<U>U` or `1E`). | Detects silent integer corruption or LLM digit hallucinations (`QLAW_02`). |
-| `&id` / `*id` | `1.0`, `2.0` | `anchor: str \| None` / `CordAlias(target=id)` | Named anchor declaration (`&id`) and bounded acyclic reference (`*id`). | Eliminates config duplication while preventing exponential alias bombs (`CWE-776`). |
+| `&id` / `*id` | `1.0`, `2.0` | `anchor: str \| None` / `CordAlias(target=id)` | Named anchor declaration (`&id`) and bounded acyclic reference (`*id`). Under `loads(..., resolve_aliases=True)` (default), aliases expand recursively with cycle, undefined-target, expansion-budget (`MAX_ALIAS_EXPANSIONS = 1_024`), and depth (`MAX_QUIPU_DEPTH = 32`) guards; under `resolve_aliases=False`, aliases decode literally as strings `"*<id>"`. If duplicate anchors appear without running `verify_quipu()`, decoder lookup keeps the last pre-order occurrence whereas `verify_quipu()` keeps the first and fails `QLAW_04`. | Eliminates config duplication while preventing exponential alias bombs (`CWE-776`). |
 
 ### 5.2 Base-10 Knot Encoding (`encode_knots` / `decode_knots`)
 
@@ -395,7 +391,7 @@ Unlike `loads()` (which strips all metadata, resolves `*alias`, and converts `@t
 | :--- | :--- | :--- |
 | `QuipuDocument` | `{"version": str, "doc_id": str, "mode": "sealed"\|"lax", "root": QuipuNode, "seal": QuipuSeal\|null, ...}` | Optional `2.0` keys (`"admin_tier"`, `"tag"`, `"parent"`, `"hub"`) are omitted when `None`. `from_dict()` defaults omitted `"version"` to `"QUIPU/1.0"`. |
 | `QuipuSeal` | `{"knot": str, "sha256": str, "reconciled": bool}` | `reconciled` defaults to `true` in `from_dict()`. |
-| `QuipuNode` | `{"value": <scalar \| list[QuipuNode] \| dict[str, QuipuNode] \| TableBox \| AliasBox>, "meta": CordMeta}` | Tagged wrappers: `TableBox = {"__quipu_table__": QuipuTable}`, `AliasBox = {"__quipu_alias__": str}`. |
+| `QuipuNode` | `{"value": <scalar \| list[QuipuNode] \| dict[str, QuipuNode] \| TableBox \| AliasBox>, "meta": CordMeta}` | Tagged wrappers inside node trees: `TableBox = {"__quipu_table__": QuipuTable}`, `AliasBox = {"__quipu_alias__": str}`. (`CordAlias.to_dict()` standalone returns `{"alias": str}`.) |
 | `CordMeta` | `{"spin": "Z"\|"S", "tier": "T0".."T3", "anchor": str\|null, "knots": str\|null, "explicit_spin": bool, "explicit_tier": bool, ...}` | Optional `2.0` keys (`"attachment"`, `"polarity"`, `"unit"`, `"wrap"`, `"nether"`) are omitted when `None`. |
 | `QuipuTable` | `{"columns": [{"name": str, "type": str}], "rows": [[scalar, ...]], "top_cords": [TopCordSpec], ...}` | Optional keys `"spacer_indices"` (omitted if empty) and `"layout"` (omitted if `None`). |
 | `TopCordSpec` | `{"kind": str, "column": str\|null, "expected": int\|float, ...}` | Optional keys (`"end_column"`, `"start_row"`, `"end_row"`, `"tolerance_pct"`, `"ratio"`) omitted when `None`. |
@@ -578,7 +574,7 @@ Invoking `quipu` with no subcommand defaults to `quipu sample --format-version 2
 | `verify` | `--file` or built-in sample | `--file`, `--json` | `report["valid"] is True` | `VIOLATION`, `SYNTAX_ERROR`, `SAFETY_VIOLATION`, or I/O error |
 | `from-json` | `--file` (**REQUIRED**) | `--file`, `--mode`, `--format-version`, `--json` | Emits `.quipu` wire | Missing `--file`, invalid JSON, or error |
 | `to-json` | `--file` or built-in sample | `--file` | Emits indented UTF-8 JSON | Parse or I/O error |
-| `bench` | `--file` (`.quipu` or `.json`) or sample | `--file`, `--json` | Emits byte/token metrics | Parse or I/O error |
+| `bench` | `--file` (`.quipu` or `.json`) or sample | `--file`, `--json` | Emits byte/token metrics (files whose `lstrip()` starts with `~=` decode as `.quipu`; others parse as JSON) | Parse or I/O error |
 | `micro` | `--file` or built-in sample | `--file`, `--json` | Emits single-line micro summary | Parse or I/O error |
 | `draw` | `--file` or built-in sample | `--file`, `--max-rows` (default `8`, min `1`), `--json` | Emits visual cord diagram | Parse or I/O error |
 | `upgrade` | `--file` or built-in sample | `--file`, `--admin-tier`, `--tag`, `--hub`, `--json` | Emits upgraded `QUIPU/2.0` | Parse or I/O error |
@@ -593,8 +589,16 @@ Invoking `quipu` with no subcommand defaults to `quipu sample --format-version 2
 - **Supported Methods**:
   - `initialize`: Returns `protocolVersion`, `capabilities: {"tools": {"listChanged": false}}`, and `serverInfo`.
   - `ping`: Returns `{}`.
-  - `tools/list`: Returns `{"tools": [QUIPU_TOOL_SPEC]}` advertising single tool `"quipu_codec"`.
-  - `tools/call`: Dispatches `name == "quipu_codec"` across all 11 actions: `verify`, `encode`, `decode`, `from_json`, `to_json`, `micro`, `draw`, `benchmark`, `upgrade`, `downgrade`, `distill`.
+  - `tools/list`: Returns `{"tools": [QUIPU_TOOL_SPEC]}` advertising single tool `"quipu_codec"` (`required: ["action"]`; optional schema properties: `quipu_text`, `json_text`, `data`, `doc_id` default `"root"`, `mode` default `"sealed"`, `version` default `"2.0"`, `admin_tier`, `tag`, `hub`, `auto_table` default `true`, `require_seal`).
+  - `tools/call`: Dispatches `name == "quipu_codec"` across all 11 actions and returns both JSON text (`content[0].text`) and `structuredContent`:
+    - `verify`: verifier report (`verify_quipu()`)
+    - `encode` / `from_json`: `{"quipu_text", "doc_id", "mode", "version"}`
+    - `decode`: `{"data": <decoded>}`
+    - `to_json`: `{"json_text": <indented_json>}`
+    - `micro`: `{"micro": <line>}`
+    - `draw`: `{"ascii": <diagram>}`
+    - `benchmark`: benchmark report (`benchmark_quipu_vs_json()`)
+    - `upgrade` / `downgrade` / `distill`: `{"action", "version", "knot", "quipu_text"}`
 - **Error Handling**:
   - Protocol errors return JSON-RPC error objects: `-32700` (Parse error), `-32600` (Invalid Request), `-32601` (Method not found), `-32602` (Invalid params / unknown tool).
   - Tool execution failures (`QuipuError`, `ValueError`, `TypeError`, `JSONDecodeError`) return a normal JSON-RPC result with `isError: true` and `structuredContent: {"error": "<message>"}`.
@@ -606,8 +610,8 @@ Invoking `quipu` with no subcommand defaults to `quipu sample --format-version 2
 3. **Lifecycle Shims**:
    - `upgrade_quipu_to_v2(doc, *, admin_tier, tag, hub, recompute_seal=True)` promotes `1.0 -> 2.0` while recording `parent = src.parent or src_knot`.
    - `downgrade_quipu_to_v1(doc, *, recompute_seal=True)` strips `2.0` header attributes, `2.0` cord decorators, table `spacer_indices`, `layout`, and `2.0` top-cords while preserving 100% of decoded JSON payload data.
-   - `distill_working_to_summary(doc, *, doc_id=None)` replaces every `QuipuTable` with a summary map `{"row_count", "column_count", "band_count", "numeric_sums"}` under `tier=summary`, `mode=sealed`, and `parent=src_knot`.
-   - `link_quipus(packets, *, hub_id="HubA", doc_id="quipu.linked.bundle")` federates one or more mixed `1.0`/`2.0` packets (sorted by slot name) into a sealed `tier=summary`, `tag="linked_hub"`, `hub=hub_id` manifest containing a banded `members` `@table(slot:str, doc_id:str, version:str, mode:str, knot:str, cords:int, rows:int)` with `^count`, `^sum(cords)`, and `^sum(rows)`.
+   - `distill_working_to_summary(doc, *, doc_id=None)` replaces every `QuipuTable` with a summary map `{"row_count", "column_count", "band_count", "numeric_sums"}` under `tier=summary`, `mode=sealed`, and `parent=src_knot`, where `band_count = len(spacer_indices) + 1` (or `0` if empty) and `numeric_sums` sums columns whose declared base type (`ctype.rstrip("?")`) is `"int"` or `"float"`.
+   - `link_quipus(packets, *, hub_id="HubA", doc_id="quipu.linked.bundle")` requires a non-empty dict of mixed `1.0`/`2.0` packets (sorted by slot name) and produces a sealed `tier=summary`, `tag="linked_hub"`, `hub=hub_id` manifest containing a banded `members` `@table(slot:str, doc_id:str, version:str, mode:str, knot:str, cords:int, rows:int)` with `^count`, `^sum(cords)`, and `^sum(rows)`, where `knot` defaults to `"unsealed"` when `None`, `cords` comes from `verify_quipu(pkt, require_seal=False)["stats"]["cords"]`, and `rows` sums `len(n.value.rows)` across direct table entries of `root.value` (when `root.value` is a map).
 
 ---
 

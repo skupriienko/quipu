@@ -134,3 +134,64 @@ def test_spec_constants_cli_and_mcp_parity() -> None:
     # Guardrail: no Mermaid blocks or local path leakage in specification
     assert "```mermaid" not in spec_text.lower()
     assert "wsl.localhost" not in spec_text
+
+
+def test_spec_documented_corner_cases() -> None:
+    from quipu.codec import data_to_quipu
+
+    # 1. Unrecognized header attrs ignored in 2.0 & dropped on serialize; v2 attrs rejected in 1.0
+    v2_extra = parse_quipu('~= QUIPU/2.0 id="x" mode=lax custom="drop_me"\n\nok: true\n')
+    assert "custom" not in serialize_quipu_body(v2_extra, include_header=True)
+
+    # 2. Headerless 1E knot alone stays QUIPU/1.0; v2 decorators/directives promote to QUIPU/2.0
+    assert parse_quipu('retries ^knots="0M-0C-4D-1E": 41\n').version == "QUIPU/1.0"
+    assert parse_quipu('retries ^unit="attempts": 41\n').version == "QUIPU/2.0"
+
+    # 3. auto_table column inference: mixed int+float -> any, nullable -> T?, max 3 strict int sums
+    inferred_doc = data_to_quipu(
+        {
+            "rows": [
+                {"a": 1, "b": 2, "c": 3, "d": 4, "mix": 1, "opt": 10},
+                {"a": 2, "b": 3, "c": 4, "d": 5, "mix": 2.5, "opt": None},
+            ]
+        },
+        mode="lax",
+    )
+    tbl = inferred_doc.root.value["rows"].value
+    assert dict(tbl.columns) == {
+        "a": "int",
+        "b": "int",
+        "c": "int",
+        "d": "int",
+        "mix": "any",
+        "opt": "int?",
+    }
+    assert [(tc.kind, tc.column) for tc in tbl.top_cords] == [
+        ("count", None),
+        ("sum", "a"),
+        ("sum", "b"),
+        ("sum", "c"),
+    ]
+
+    # 4. Syntax vs Safety error routing + implicit vs explicit ~Z spin containment
+    deep_wire = " ".join(["{ a:"] * 35) + " 1 " + " ".join(["}"] * 35)
+    safety_rep = verify_quipu(deep_wire)
+    assert safety_rep["verdict"] == "SAFETY_VIOLATION"
+    assert safety_rep["laws_checked"] == ["QLAW_07_SAFETY_BOUNDS"]
+
+    syntax_rep = verify_quipu("bad: bare_str\n")
+    assert syntax_rep["verdict"] == "SYNTAX_ERROR"
+    assert syntax_rep["laws_checked"] == []
+
+    imp_spin = '~= QUIPU/2.0 id="s1" mode=lax\nbox: {\n  x ~S: 1\n}\n'
+    exp_spin = '~= QUIPU/2.0 id="s2" mode=lax\nbox ~Z: {\n  x ~S: 1\n}\n'
+    assert verify_quipu(imp_spin)["valid"] is True
+    assert verify_quipu(exp_spin)["valid"] is False
+
+    # 5. Top-cord parser normalization (pct -> float, omitted band ratio -> "1/2")
+    norm_doc = parse_quipu(
+        '~= QUIPU/2.0 id="n" mode=lax\n'
+        "t: @table(v:int) ^tol(v, pct=10)=95 ^band(v)=100 {\n  50\n  ---\n  50\n}\n"
+    )
+    rendered = serialize_quipu_body(norm_doc, include_header=True)
+    assert '^tol(v, pct=10.0)=95 ^band(v, ratio="1/2")=100' in rendered

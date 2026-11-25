@@ -51,7 +51,7 @@ QUIPU_TOOL_SPEC: dict[str, Any] = {
     "name": "quipu_codec",
     "description": (
         "Encode, decode, verify (7-law QUIPU/1.0 and 10-law QUIPU/2.0), benchmark, "
-        "compact, and convert between JSON and .quipu format."
+        "render micro/draw diagrams, compact, and convert between JSON and .quipu format."
     ),
     "inputSchema": {
         "type": "object",
