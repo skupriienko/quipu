@@ -13,44 +13,52 @@
 
 ## Purpose & Target Use Cases
 
-JSON, YAML, and TOML each solve a narrow slice of structured data exchange while leaving four recurring engineering gaps open:
+JSON, YAML, and TOML each solve a narrow slice of structured data exchange while leaving recurring reliability, security, and verification gaps open in modern AI-assisted engineering:
 
-1. **Ergonomic Configuration Without Parser Hazards**: JSON forbids `#` comments and trailing commas; YAML 1.2 suffers from implicit type coercion (`yes`/`no` -> bool) and exponential alias-bomb DoS (`CWE-776`). `.quipu` supports `#` comments, bare keys, trailing commas, and headerless `lax` mode while remaining **100% losslessly isomorphic to JSON**.
-2. **AI / LLM Structured State & Tool I/O**: Uniform record lists waste tokens repeating identical keys in JSON. `@table(...)` compiles uniform records into typed columnar grids (distinguishing `bool` from `int`), enforces working-window ceilings (`MAX_WORKING_ROWS = 1000`), and attaches provenance trust tiers (`@T0..@T3`) to prevent prompt/data poisoning.
-3. **Zero-Key-Repetition Typed Telemetry**: Banded `@table` blocks support row spacers (`---`), sub-slice sums (`^sum(col, start, end)`), and compact bit-register fingerprints (`encode_7bit`, `encode_14bit`, `render_quipu_micro`) for $O(1)$ routing and telemetry inspection.
-4. **Double-Entry & Tolerance-Guarded Financial / Resource Ledgers**: Inline upward assertions (`^count`, `^sum`, `^net`, `^equal_sum`, `^tol`, `^band`, `^quota`) verify conservation laws, budget tolerances, and cohort quotas statically before application logic executes.
-5. **Tamper-Evident Signed Lockfiles & Multi-Agent Handoffs**: `mode=sealed` enforces a deterministic SHA-256 content seal (`=~ knot="quipu-<12hex>"`), tracks cryptographic `parent` lineage across `working -> summary` distillation, and federates mixed `1.0`/`2.0` packets under `hub` manifests via `link_quipus()`.
+1. **Hazard-Free Application & Agent Configs (`mode=lax`)**: JSON forbids `#` comments and trailing commas; YAML 1.2 suffers from implicit type coercion (`yes`/`no` -> bool) and exponential alias-bomb DoS (`CWE-776`). Headerless `.quipu` supports `#` comments, bare keys, and trailing commas while guaranteeing **100% lossless bijection with JSON**.
+2. **Sub-8KB CLI Hook & MCP Tool Envelopes (`@table` + `distill`)**: Many coding-agent CLI harnesses silently truncate hook or tool outputs above ~8,000 characters, and JSON wastes tokens repeating keys across uniform rows. `@table(...)` eliminates key repetition while validating column types (`bool != int`), and `distill_working_to_summary()` + `render_quipu_micro()` collapse `working` tables (`<= 1000` rows) into sub-8KB `summary` receipts or single-line fingerprints.
+3. **Tamper-Evident Security Scan, TDD & Review Receipts (`=~`)**: Automated security scanners, red-green-refactor TDD verifiers, and architecture rationale checkers stamp pass/fail receipts with deterministic SHA-256 knots (`=~ knot="quipu-<12hex>"`) and `^count=0` violation invariants checked in sub-millisecond time before merge or deployment.
+4. **Curated CWE / OWASP Vulnerability & Rule Vaults (`@table` + `QLAW_03`)**: Maintaining multi-hundred-row static-analysis rule catalogs and remediation matrices as diff-friendly `@table` grids ensures accidental row deletion, column shifts, or severity-plane drift trip `QLAW_03` (`^count`, `^sum`) immediately in CI.
+5. **Multi-Agent Parallel Fan-Out & Hub Handoffs (`link_quipus`)**: Independent worker agents (researcher, implementer, verifier) emit small, self-contained sealed packets (`1.0` or `2.0`) that a coordinator merges into one federated `hub` manifest via `link_quipus()`, preserving end-to-end cryptographic provenance without context-window bloat.
+6. **Prompt-Injection & RAG Taint Quarantine (`@T0..@T3`, `~Z`/`~S`)**: Labeling system policies (`~Z @T0` immutable SSOT) alongside untrusted web/user/MCP tool payloads (`~S @T3`) prevents accidental mutation (`QLAW_05`) and enforces taint non-escalation (`QLAW_06`) so trusted nodes can never reference untrusted anchors.
+7. **Content-Addressed Context Cartridges & Memory Snapshots (`parent`)**: Pinning distilled reference packs, episodic agent logs, and session checkpoints by `quipu-<12hex>` seals lets runtimes verify cache freshness in $O(1)$ and trace derived summaries back to exact upstream artifacts via `parent="quipu-..."`.
+8. **Double-Entry FinOps, Token Budgets & Ranked Scorecards (`@W`/`@D`, `^net`, `^tol`)**: Financial ledgers, LLM token budgets, and prioritized triage tables declare credit/debt polarity (`@W`/`@D`), conservation equations (`^net`, `^equal_sum`), overrun guardrails (`^tol`), contiguous rank sums (`^sum(rank)`), and zero-blocker invariants (`^sum(blockers)=0`) to catch silent arithmetic hallucinations before downstream APIs execute.
+9. **Primary / Canary Rollout Twins (`~R`/`~V` & `^unit`)**: Active production parameters (`~R`) and shadow/canary verification twins (`~V`) live side-by-side under explicit physical/semantic units (`^unit="ms"`, `^unit="usd"`, `^unit="tokens"`) without inventing ad-hoc `"_shadow"` key suffixes or mismatching milliseconds vs seconds.
+10. **Self-Auditing Workspace & Package Inventories (`^count` + `^sum`)**: Release engineering scripts emit dual-ledger artifact manifests tracking file paths, versions, and SHA-256 checksums backed by inline `^count` and `^sum` assertions to catch silent workspace drift before publishing.
 
 ---
 
 ## Format Comparison
 
-| Capability | **QUIPU/2.0 (`.quipu`)** | **JSON** | **JSONC / JSON5** | **YAML 1.2** | **TOML 1.0** | **CSV / TSV** | **XML** |
+| Capability | **QUIPU/2.0** | **JSON** | **JSONC / 5** | **YAML 1.2** | **TOML 1.0** | **CSV / TSV** | **XML** |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Comments (`# ...`)** | Yes | No | Yes (`//`, `/* */`) | Yes | Yes | No | Yes (`<!-- -->`) |
-| **Lossless JSON Bijection** | **100%** | Native | Partial (NaN/hex) | Ambiguous (`yes`/`no`) | Partial (dates/tables) | Flat only | Lossy (attrs vs elems) |
-| **Typed Columnar `@table`** | **Built-in (`bool != int`)** | No | No | No | Verbose `[[array]]` | Untyped | Verbose |
-| **Inline Arithmetic & Double-Entry** | **`^count`, `^sum`, `^net`, `^tol`, `^band`, `^quota`** | No | No | No | No | No | External XSD/Schematron |
-| **Built-in SHA-256 Content Seal (`=~`)** | **Built-in (`quipu-<12hex>`)** | External JWS | External | External | External | External | XML-DSig (complex) |
-| **Safe Bounded Aliases** | **Bounded DAG (`<= 1024`)** | No | No | Unsafe (billion-laughs risk) | No | No | XXE / Entity risk |
-| **Mutability & Data-Trust Tiers** | **`~Z`/`~S`, `~R`/`~V`, `@T0..@T3`, `@W`/`@D`** | No | No | Custom tags (untyped) | No | No | Custom attributes |
-| **Hierarchical Distillation & Hub Linking** | **Built-in (`tier`, `parent`, `hub`)** | No | No | No | No | No | Manual |
-| **Zero-Dependency Footprint** | **Yes (0 deps, pure stdlib)** | Yes | Needs parser | Needs PyYAML/ruamel | Write needs `tomli-w` | Flat only | Expat/lxml risk |
+| **Comments (`#`)** | ✅ | ❌ | ✅ | ✅ | ✅ | ❌ | ✅ |
+| **Lossless JSON Bijection** | ✅ | ✅ | ⚠️ `NaN`/hex | ⚠️ `yes`/`no` | ⚠️ types | ❌ flat | ⚠️ lossy |
+| **Typed Columnar `@table`** | ✅ `bool!=int` | ❌ | ❌ | ❌ | ⚠️ verbose | ⚠️ untyped | ❌ |
+| **Inline Math & Double-Entry** | ✅ `^sum`/`^net` | ❌ | ❌ | ❌ | ❌ | ❌ | ⚠️ XSD |
+| **Built-in SHA-256 Seal (`=~`)** | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ⚠️ DSig |
+| **Bounded Safe Aliases** | ✅ `<=1024` | ❌ | ❌ | ⚠️ DoS risk | ❌ | ❌ | ⚠️ XXE risk |
+| **Mutability & Trust Tiers** | ✅ `~Z`/`@T0..3` | ❌ | ❌ | ⚠️ untyped | ❌ | ❌ | ⚠️ attrs |
+| **Tiered Rollup & Hub Link** | ✅ `tier`/`hub` | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| **Zero-Dep Stdlib Codec** | ✅ `0` deps | ✅ | ❌ | ❌ | ⚠️ read-only | ✅ flat | ⚠️ parser |
+
+> **Legend:** ✅ Built-in / Native · ⚠️ Partial, external schema, or safety caveat · ❌ Not supported
 
 ---
 
 ## Architecture
 
-```mermaid
-flowchart LR
-    V1["QUIPU/1.0 Wire (~= QUIPU/1.0)"] -->|"parse() [7 Laws: QLAW_01..07]"| AST["Unified QuipuDocument AST"]
-    V2["QUIPU/2.0 Wire (~= QUIPU/2.0)"] -->|"parse() [10 Laws: QLAW_01..10]"| AST
-    AST -->|"dumps(version='1.0') / downgrade_quipu_to_v1()"| V1
-    AST -->|"dumps(version='2.0') / upgrade_quipu_to_v2()"| V2
-    AST <-->|"loads() / dumps() / load() / dump()"| JSON["Python / JSON Data"]
-    V2 -->|"distill_working_to_summary()"| SUM["Summary Packet (parent=knot)"]
-    V1 & V2 -->|"link_quipus()"| HUB["Federated Hub Manifest (QUIPU/2.0)"]
-    AST -->|"verify()"| REP["Verification Report & SHA-256 Seal"]
+```text
+  QUIPU/1.0 Wire (~= QUIPU/1.0) ──▶ parse() [7 Laws: QLAW_01..07] ──┐
+                                                                    ▼
+  QUIPU/2.0 Wire (~= QUIPU/2.0) ──▶ parse() [10 Laws: QLAW_01..10] ─┴─▶ Unified QuipuDocument AST
+                                                                          │
+        ┌─────────────────────────────────────────────────────────────────┼──────────────────────┐
+        ▼                                 ▼                               ▼                      ▼
+  Python / JSON Data            Version & Tier Shims             Federation Hub         Static Verifier
+  • loads() / load()            • upgrade_quipu_to_v2()          • link_quipus()        • verify() [10 Laws]
+  • dumps() / dump()            • downgrade_quipu_to_v1()        • hub="..."            • =~ SHA-256 Knot Seal
+  • 100% lossless bijection     • distill_working_to_summary()   • mixed 1.0 + 2.0      • 7-bit / 14-bit micro
 ```
 
 ---
