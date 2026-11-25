@@ -194,7 +194,7 @@ top_cord      ::= "^count" "=" INT
 4. **Pre-Brace and Post-Brace Top-Cords**: `@table` parsers MUST accept `top_cords` both before `{` and after `}`, appending them in encounter order. If `^layout` is specified more than once, the final declaration wins.
 5. **Nesting Depth Enforcement**: Root node starts at `depth = 0`. Entering each child of a map or list increments `depth` by `1`; entering `@table` checks `depth + 1 > MAX_QUIPU_DEPTH`. Exceeding `MAX_QUIPU_DEPTH` (`32`) MUST raise `QuipuSyntaxError`.
 6. **Strict `QUIPU/1.0` Gating**: When a document explicitly declares `~= QUIPU/1.0`, any `QUIPU/2.0` header attribute (`tier`, `tag`, `parent`, `hub`), decorator (`~R`, `~V`, `@W`, `@D`, `^unit`, `^wrap`, `^nether`), table spacer (`---`), or table directive (`^layout`, slice `^sum`, `^net`, `^equal_sum`, `^tol`, `^band`, `^quota`) MUST raise `QuipuSyntaxError`.
-7. **Headerless Promotion**: When no `~=` header is present, `doc_id` defaults to `"root"`, `mode` defaults to `lax`, and `version` defaults to `"QUIPU/1.0"`. After parsing `root`, if any AST node contains a `QUIPU/2.0` decorator (`attachment`, `polarity`, `unit`, `wrap`, `nether`) or any `@table` contains `spacer_indices`, `layout`, or a `QUIPU/2.0` top-cord, `version` MUST auto-promote to `"QUIPU/2.0"`.
+7. **Headerless Promotion**: When no `~=` header is present, `doc_id` defaults to `"root"`, `mode` defaults to `lax`, and `version` defaults to `"QUIPU/1.0"`. After parsing `root`, if any AST node contains a `QUIPU/2.0` decorator (`attachment`, `polarity`, `unit`, `wrap`, `nether`) or any `@table` contains `spacer_indices`, `layout`, or a `QUIPU/2.0` top-cord, `version` MUST auto-promote to `"QUIPU/2.0"`. Note that `1E` inside `^knots="..."` alone does NOT trigger auto-promotion.
 
 ### 3.3 Normative Syntax Error vs. Static Verification Matrix
 
@@ -364,7 +364,7 @@ Signed non-boolean integers map deterministically to positional base-10 strings 
 ^(-?)(\d+)M-(\d)C-(\d)D-(?:(\d)U|(1)E)$
 ```
 
-- `M` = thousands ($10^3$), `C` = hundreds digit ($10^2$), `D` = tens digit ($10^1$), `U` = units digit ($10^0$).
+- `M` = $\lfloor |v| / 1000 \rfloor$, `C` = $\lfloor (|v| \bmod 1000) / 100 \rfloor$, `D` = $\lfloor (|v| \bmod 100) / 10 \rfloor$, `U` = $|v| \bmod 10$.
 - **`1E` Singular Unit Marker**: When `figure_eight_unit=True` and $|v| \bmod 10 = 1$, the units segment encodes as `1E` instead of `1U` (e.g., `41 -> "0M-0C-4D-1E"`). `decode_knots()` decodes both `1U` and `1E` to unit digit `1`.
 
 ### 5.3 Structural Bit Registers, Scale Buckets & Quota Projection
@@ -562,7 +562,7 @@ Anchors record their `eff_tier` during the document walk.
 }
 ```
 
-*(For `SAFETY_VIOLATION`, `laws_checked` is `["QLAW_07_SAFETY_BOUNDS"]`.)*
+*(QuipuSyntaxError messages containing `"Maximum nesting depth"`, `"MAX_QUIPU_DEPTH"`, `"MAX_QUIPU_BYTES"`, `"Non-finite float"`, or `"Null byte"` return `verdict="SAFETY_VIOLATION"`, `law="QLAW_07_SAFETY_BOUNDS"`, and `laws_checked=["QLAW_07_SAFETY_BOUNDS"]`; all other syntax errors return `verdict="SYNTAX_ERROR"`, `law="QLAW_00_SYNTAX"`, and `laws_checked=[]`.)*
 
 ---
 

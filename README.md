@@ -288,10 +288,10 @@ While all wire tokens and Python identifiers in `QUIPU/2.0` use concise English 
 
 `quipu` targets strict RFC-grade interoperability across four incremental conformance profiles defined in [docs/SPECIFICATION.md](docs/SPECIFICATION.md):
 
-- **Profile A — Core Reader/Writer**: Lossless `QUIPU/1.0` & `QUIPU/2.0` parsing, JSON bijection (`loads`/`dumps`, `load`/`dump`), deterministic canonical serialization, and SHA-256 `=~` sealing.
-- **Profile B — Full Static Verifier**: Deterministic 7-law (`1.0`) and 10-law (`2.0`) validation (`QLAW_01`..`QLAW_10`), plus explicit error routing between parse syntax failures (`QLAW_00_SYNTAX` -> `SYNTAX_ERROR`) and resource/safety bounds (`QLAW_07_SAFETY_BOUNDS` -> `SAFETY_VIOLATION`).
-- **Profile C — Shims, Distillation & Federation**: Lossless `upgrade_quipu_to_v2()`, `downgrade_quipu_to_v1()`, `distill_working_to_summary()`, and multi-packet `link_quipus()`.
-- **Profile D — Operational Renderers, CLI & Stdio MCP**: `render_quipu_micro()`, `draw()` (`MAX_ASCII_CHARS = 8_000`), all 11 CLI subcommands, and the Stdio JSON-RPC 2.0 MCP server (`2024-11-05`).
+- **Profile A — Core Reader / Decoder**: UTF-8 NUL/size pre-checks, lexer & parser, strict `QUIPU/1.0` feature gating, bounded acyclic `&anchor`/`*alias` resolution, and lossless `loads()` JSON projection.
+- **Profile B — Canonical Writer & Cryptographic Sealer**: Profile A plus byte-identical `serialize_quipu_body()`, SHA-256 `=~` `compute_quipu_seal()`, `auto_table` compilation, and lossless AST JSON serialization (`to_dict`/`from_dict`).
+- **Profile C — Static Verification Engine**: Profile B plus deterministic 7-law (`1.0`) and 10-law (`2.0`) checking (`QLAW_01`..`QLAW_10`) with exact numeric tolerances and `QLAW_00_SYNTAX` vs `QLAW_07_SAFETY_BOUNDS` error routing.
+- **Profile D — Lifecycle, Federation & Tooling**: Profile C plus `upgrade_quipu_to_v2()`, `downgrade_quipu_to_v1()`, `distill_working_to_summary()`, `link_quipus()`, `render_quipu_micro()`, `render_quipu_ascii()` / `draw()` (`MAX_ASCII_CHARS = 8_000`), all 11 CLI subcommands, and the Stdio JSON-RPC 2.0 MCP server (`2024-11-05`).
 
 Appendix A of [docs/SPECIFICATION.md](docs/SPECIFICATION.md) ships **6 positive golden vectors (`V1`–`V6`)** with locked SHA-256 seals and **12 negative syntax/law vectors (`NEG-01`..`NEG-12`)**, verified automatically by [tests/test_spec_conformance.py](tests/test_spec_conformance.py).
 
