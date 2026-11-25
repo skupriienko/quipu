@@ -1,0 +1,20 @@
+~= QUIPU/2.0 id="pipeline.telemetry.batch" mode=sealed tier=working tag="metrics"
+
+service ~R @W: "edge-gateway"
+defaults &prod_defaults ~Z @T0: {
+  region: "eu-central-1"
+  retries ^unit="attempts" ^wrap="bounded_backoff" ^knots="0M-0C-4D-1E": 41
+}
+active_defaults: *prod_defaults
+canary_override ~S ~V @T2 @D: {
+  retries ^nether=3: 38
+}
+stage_metrics @W ^unit="tokens": @table(stage:str, tokens:int, passed:bool) ^layout="banded" ^count=4 ^sum(tokens)=500 ^sum(tokens, 0, 1)=300 ^tol(tokens, pct=5.0)=490 ^band(tokens, ratio="3/5")=500 {
+  "ingest" | 120 | true
+  "validate" | 180 | true
+  ---
+  "transform" | 140 | true
+  "export" | 60 | true
+}
+
+=~ knot="quipu-52623ab5e312" sha256="52623ab5e312c5e48a47814acd62ac3e9ac5c42646fb52ce91d27a4db25d3f45" reconciled=true

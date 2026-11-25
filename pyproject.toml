@@ -1,0 +1,82 @@
+[build-system]
+requires = ["setuptools>=77.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "quipu"
+version = "2.0.0"
+description = "Standalone QUIPU/2.0 & QUIPU/1.0 (.quipu) AI-Native Structured Data, Columnar Arithmetic & Cryptographic Provenance Format"
+readme = "README.md"
+authors = [
+  { name = "Serhii Kupriienko", email = "61395455+skupriienko@users.noreply.github.com" }
+]
+license = "MIT"
+requires-python = ">=3.10"
+keywords = [
+  "quipu",
+  "serialization",
+  "ai-native",
+  "provenance",
+  "columnar-format",
+  "mcp",
+  "json-isomorphism",
+  "verification"
+]
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Intended Audience :: Developers",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Typing :: Typed"
+]
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0.0",
+  "pytest-cov>=5.0.0",
+  "ruff>=0.4.0",
+  "mypy>=1.10.0",
+  "build>=1.2.0"
+]
+
+[project.scripts]
+quipu = "quipu.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/skupriienko/quipu"
+Repository = "https://github.com/skupriienko/quipu.git"
+Issues = "https://github.com/skupriienko/quipu/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+quipu = ["py.typed"]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+pythonpath = ["src"]
+addopts = "-ra -q --strict-markers"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+ignore = []
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+warn_return_any = true
+warn_unused_configs = true

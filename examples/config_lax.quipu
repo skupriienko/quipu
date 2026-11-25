@@ -1,0 +1,18 @@
+# Ergonomic headerless QUIPU config (defaults to QUIPU/1.0 lax mode)
+# Supports inline comments, unquoted bare keys, and trailing commas.
+
+service: "edge-router"
+environment: "production"
+replicas: 3
+tls_enabled: true
+
+timeouts: {
+  connect_ms: 250,
+  read_ms: 1500,
+  idle_ms: 30000,
+}
+
+allow_origins: [
+  "https://app.example.org",
+  "https://admin.example.org",
+]

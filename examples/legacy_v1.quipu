@@ -1,0 +1,19 @@
+~= QUIPU/1.0 id="service.release.v1" mode=sealed
+
+service: "edge-gateway"
+version: "1.0.0"
+defaults &v1_defaults ~Z @T0: {
+  region: "eu-central-1"
+  retries ^knots="0M-0C-0D-3U": 3
+}
+active_defaults: *v1_defaults
+checks: @table(stage:str, tokens:int, passed:bool) ^count=3 ^sum(tokens)=176 {
+  "schema_lint" | 42 | true
+  "unit_tests" | 118 | true
+  "verify_seal" | 16 | true
+}
+external_webhook ~S @T2: {
+  url: "https://hooks.example.org/ingest"
+}
+
+=~ knot="quipu-355878d6a9b5" sha256="355878d6a9b506cba9bb2d3e8683765fb9b5b160b8ff833dff1be090ea28dc15" reconciled=true

@@ -1,0 +1,12 @@
+~= QUIPU/2.0 id="treasury.q4.ledger" mode=sealed tier=working tag="fiscal_reconciliation"
+
+currency ~Z @T0: "USD"
+ledger ~Z @T0 @W ^unit="usd": @table(region:str, credit:int, debt:int, guard:int) ^layout="banded" ^count=4 ^sum(credit, 0, 1)=600 ^net(credit, debt)=0 ^equal_sum(credit, debt)=1000 ^tol(credit, pct=5.0)=980 ^band(credit, ratio="3/5")=1000 ^quota(guard, pct=22.5)=4000 {
+  "North" | 300 | 250 | 200
+  "East" | 300 | 250 | 200
+  ---
+  "South" | 200 | 250 | 250
+  "West" | 200 | 250 | 250
+}
+
+=~ knot="quipu-a351f60d7a7d" sha256="a351f60d7a7d135169a6f00b4220dcaf5b8d7b87e8693ae3820f37ea65997854" reconciled=true
