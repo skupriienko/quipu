@@ -264,6 +264,25 @@ Add the following to your MCP client configuration (Claude Desktop, Cursor, Wind
 
 ---
 
+## Using with AI Coding Agents (Agent Skill)
+
+This repository includes an Agent Skills specification–compliant skill at [`skills/quipu/SKILL.md`](skills/quipu/SKILL.md) (mirrored at [`SKILL.md`](SKILL.md)) with focused references in [`skills/quipu/references/`](skills/quipu/references/syntax-and-laws.md).
+
+```bash
+# 1. Install via npx skills CLI (Claude Code, Codex, Cursor, Windsurf, Gemini CLI, etc.)
+npx skills add skupriienko/quipu
+
+# 2. Or clone / copy into your agent's global or project skill directory
+git clone https://github.com/skupriienko/quipu.git /tmp/quipu-repo
+cp -r /tmp/quipu-repo/skills/quipu ~/.claude/skills/quipu   # Claude Code
+# cp -r /tmp/quipu-repo/skills/quipu ~/.agents/skills/quipu # Cross-agent (~/.agents/skills)
+# cp -r /tmp/quipu-repo/skills/quipu .cursor/skills/quipu   # Project-local Cursor
+```
+
+Pair the skill with `pip install "git+https://github.com/skupriienko/quipu.git"` (CLI) or the `quipu mcp` Stdio server above so agents can both follow `.quipu` best practices and run live verification/drawing tools.
+
+---
+
 ## Andean Epigraphic Heritage
 
 While all wire tokens and Python identifiers in `QUIPU/2.0` use concise English keywords, the data model is directly inspired by structural mechanisms documented in Andean *khipu* archives:

@@ -57,7 +57,7 @@ _LEGACY_TERM_RE = re.compile(
 
 def _iter_repo_files() -> list[Path]:
     files: list[Path] = []
-    for dir_name in ("src", "docs", "tests", "examples", ".github"):
+    for dir_name in ("src", "docs", "tests", "examples", "skills", ".github"):
         sub = _REPO_ROOT / dir_name
         if sub.is_dir():
             for path in sorted(sub.rglob("*")):
